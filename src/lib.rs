@@ -10,7 +10,7 @@
 //! use anvil_region::AnvilChunkProvider;
 //! use anvil_region::FolderChunkProvider;
 //!
-//! let chunk_provider = FolderChunkProvider::new("test/region");
+//! let mut chunk_provider = FolderChunkProvider::new("test/region");
 //!
 //! let chunk_compound_tag = chunk_provider.load_chunk(4, 2).unwrap();
 //! let level_compound_tag = chunk_compound_tag.get_compound_tag("Level").unwrap();
@@ -26,7 +26,7 @@
 //! use anvil_region::FolderChunkProvider;
 //! use nbt::CompoundTag;
 //!
-//! let chunk_provider = FolderChunkProvider::new("test/region");
+//! let mut chunk_provider = FolderChunkProvider::new("test/region");
 //! let mut chunk_compound_tag = CompoundTag::new();
 //! let mut level_compound_tag = CompoundTag::new();
 //!
@@ -50,6 +50,11 @@ use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
+
+#[cfg(feature = "zip")]
+pub mod zip_chunk_provider;
+#[cfg(feature = "zip")]
+pub use zip_chunk_provider::*;
 
 /// Amount of chunks in region.
 const REGION_CHUNKS: usize = 1024;
@@ -166,8 +171,8 @@ impl RegionAndOffset {
 }
 
 pub trait AnvilChunkProvider {
-    fn load_chunk(&self, chunk_x: i32, chunk_z: i32) -> Result<CompoundTag, ChunkLoadError>;
-    fn save_chunk(&self, chunk_x: i32, chunk_z: i32, chunk_compound_tag: CompoundTag) -> Result<(), ChunkSaveError>;
+    fn load_chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<CompoundTag, ChunkLoadError>;
+    fn save_chunk(&mut self, chunk_x: i32, chunk_z: i32, chunk_compound_tag: CompoundTag) -> Result<(), ChunkSaveError>;
 }
 
 /// The chunks are saved in a folder (the default)
@@ -197,7 +202,7 @@ impl<'a> AnvilChunkProvider for FolderChunkProvider<'a> {
     /// use anvil_region::AnvilChunkProvider;
     /// use anvil_region::FolderChunkProvider;
     ///
-    /// let chunk_provider = FolderChunkProvider::new("test/region");
+    /// let mut chunk_provider = FolderChunkProvider::new("test/region");
     ///
     /// let chunk_compound_tag = chunk_provider.load_chunk(4, 2).unwrap();
     /// let level_compound_tag = chunk_compound_tag.get_compound_tag("Level").unwrap();
@@ -205,7 +210,7 @@ impl<'a> AnvilChunkProvider for FolderChunkProvider<'a> {
     /// assert_eq!(level_compound_tag.get_i32("xPos").unwrap(), 4);
     /// assert_eq!(level_compound_tag.get_i32("zPos").unwrap(), 2);
     /// ```
-    fn load_chunk(&self, chunk_x: i32, chunk_z: i32) -> Result<CompoundTag, ChunkLoadError> {
+    fn load_chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<CompoundTag, ChunkLoadError> {
         let RegionAndOffset {
             region_x,
             region_z,
@@ -235,7 +240,7 @@ impl<'a> AnvilChunkProvider for FolderChunkProvider<'a> {
     /// use anvil_region::FolderChunkProvider;
     /// use nbt::CompoundTag;
     ///
-    /// let chunk_provider = FolderChunkProvider::new("test/region");
+    /// let mut chunk_provider = FolderChunkProvider::new("test/region");
     /// let mut chunk_compound_tag = CompoundTag::new();
     /// let mut level_compound_tag = CompoundTag::new();
     ///
@@ -249,7 +254,7 @@ impl<'a> AnvilChunkProvider for FolderChunkProvider<'a> {
     /// chunk_provider.save_chunk(31, 16, chunk_compound_tag);
     /// ```
     fn save_chunk(
-        &self,
+        &mut self,
         chunk_x: i32,
         chunk_z: i32,
         chunk_compound_tag: CompoundTag,
@@ -708,7 +713,7 @@ mod tests {
 
     #[test]
     fn test_load_chunk_no_folder() {
-        let chunk_provider = FolderChunkProvider::new("no-folder");
+        let mut chunk_provider = FolderChunkProvider::new("no-folder");
         let load_error = chunk_provider.load_chunk(4, 4).err().unwrap();
 
         match load_error {
@@ -722,7 +727,7 @@ mod tests {
 
     #[test]
     fn test_load_chunk_no_region() {
-        let chunk_provider = FolderChunkProvider::new("test/region");
+        let mut chunk_provider = FolderChunkProvider::new("test/region");
         let load_error = chunk_provider.load_chunk(100, 100).err().unwrap();
 
         match load_error {
@@ -736,7 +741,7 @@ mod tests {
 
     #[test]
     fn test_load_chunk_chunk_not_found() {
-        let chunk_provider = FolderChunkProvider::new("test/region");
+        let mut chunk_provider = FolderChunkProvider::new("test/region");
         let load_error = chunk_provider.load_chunk(15, 14).err().unwrap();
 
         match load_error {
