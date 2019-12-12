@@ -8,6 +8,11 @@ use crate::{AnvilChunkProvider, AnvilRegion, ChunkSaveError, ChunkLoadError, Reg
 /// The chunks are read from a zip file
 pub struct ZipChunkProvider<R: Read + Seek> {
     zip_archive: ZipArchive<R>,
+    // Prefix for the region folder. Must end with "/". Default: "region/"
+    // This is useful for zip archives consisting of only one folder
+    // For example, if there is only one folder named "world", then this
+    // variable will be set to "world/region/"
+    region_prefix: String,
     // Cache (region_x, region_z) to uncompressed file
     cache: HashMap<(i32, i32), Vec<u8>>,
 }
@@ -15,17 +20,34 @@ pub struct ZipChunkProvider<R: Read + Seek> {
 impl<R: Read + Seek> ZipChunkProvider<R> {
     pub fn new(reader: R) -> Self {
         let mut zip_archive = ZipArchive::new(reader).unwrap();
+        let mut region_prefix = format!("region/");
+        let mut found_region_count = 0;
         debug!("Contents of zip archive:");
         for i in 0..zip_archive.len() {
             let file = zip_archive.by_index(i).unwrap();
-            debug!("Filename: {}", file.name());
+            let full_path = file.sanitized_name();
+            let folder_name = full_path.file_name();
+            use std::ffi::OsStr;
+            if folder_name == Some(OsStr::new("region")) {
+                found_region_count += 1;
+                debug!("Found region/ folder at {}", file.name());
+                region_prefix = file.name().to_string();
+            }
+            debug!("Filename: {}", full_path.display());
+        }
+        // TODO: replace panic with return Err
+        if found_region_count == 0 {
+            panic!("No region/ folder found, aborting");
+        }
+        if found_region_count > 1 {
+            panic!("Found more than one region/ folder, aborting");
         }
         let cache = HashMap::new();
 
-        ZipChunkProvider { zip_archive, cache }
+        ZipChunkProvider { zip_archive, region_prefix, cache }
     }
-    pub fn region_path(region_x: i32, region_z: i32) -> String {
-        format!("region/r.{}.{}.mca", region_x, region_z)
+    pub fn region_path(&self, region_x: i32, region_z: i32) -> String {
+        format!("{}r.{}.{}.mca", self.region_prefix, region_x, region_z)
     }
 }
 
@@ -42,7 +64,7 @@ impl<R: Read + Seek> AnvilChunkProvider for ZipChunkProvider<R> {
         let buf = if let Some(buf) = self.cache.get_mut(&(region_x, region_z)) {
             buf
         } else {
-            let region_path = Self::region_path(region_x, region_z);
+            let region_path = self.region_path(region_x, region_z);
 
             let mut region_file = match self.zip_archive.by_name(&region_path) {
                 Ok(x) => x,
