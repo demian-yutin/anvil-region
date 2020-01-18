@@ -58,6 +58,13 @@ fn find_region_folder_path<R: Read + Seek>(
         // we handle that case as an empty string
         let folder_name = full_path.file_name().unwrap_or_default();
         if folder_name == "region" {
+            if let Some(parent) = full_path.parent() {
+                let parent_file_name = parent.file_name().unwrap_or_default();
+                if parent_file_name == "DIM1" || parent_file_name == "DIM-1" {
+                    // Skip nether and end regions
+                    continue;
+                }
+            }
             found_region_count += 1;
             region_prefix = file.name().to_string();
             // Keep searching after finding the first folder, to make sure
