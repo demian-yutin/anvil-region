@@ -13,7 +13,7 @@ readme = "README.md"
 [dependencies]
 byteorder = "1.3"
 named-binary-tag = "0.2"
-bitvec = "0.15"
+bitvec = "0.17.4"
 zip = { optional = true, version = "0.5.3", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
